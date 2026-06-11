@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Conveyor Belt AR</title>
+
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <!-- AR.js untuk A-Frame -->
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #ui-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    #header {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,0.75) 0%, transparent 100%);
+      padding: 16px 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #header .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #ff3b30;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    #header .dot.active {
+      background: #34c759;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    #header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.5px;
+    }
+
+    #header span {
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      margin-left: auto;
+    }
+
+    #instruction {
+      position: absolute;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 16px;
+      padding: 14px 24px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    #instruction p {
+      font-size: 13px;
+      color: rgba(255,255,255,0.9);
+      line-height: 1.5;
+    }
+
+    #instruction p span {
+      color: #ffd60a;
+      font-weight: 600;
+    }
+
+    #marker-box {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 50px;
+      padding: 10px 18px;
+      pointer-events: auto;
+    }
+
+    #marker-box img {
+      width: 36px; height: 36px;
+      border-radius: 6px;
+    }
+
+    #marker-box p {
+      font-size: 12px;
+      color: rgba(255,255,255,0.8);
+    }
+
+    #marker-box strong {
+      display: block;
+      font-size: 13px;
+      color: #fff;
+    }
+
+    #scale-controls {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .ctrl-btn {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .ctrl-btn:active {
+      background: rgba(255,255,255,0.2);
+    }
+
+    #status-dot {
+      width: 10px; height: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- A-Frame AR Scene -->
+  <a-scene
+    embedded
+    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+    renderer="logarithmicDepthBuffer: true; antialias: true;"
+    vr-mode-ui="enabled: false"
+    loading-screen="enabled: false"
+  >
+
+    <a-assets>
+      <!-- Ganti nama file sesuai file GLB kamu -->
+      <a-asset-item id="conveyor-model" src="conveyor_belt.glb"></a-asset-item>
+    </a-assets>
+
+    <!-- Marker: pakai Hiro marker (default AR.js, bisa di-print) -->
+    <a-marker type="hiro" id="main-marker">
+      <a-entity
+        id="conveyor-entity"
+        gltf-model="#conveyor-model"
+        scale="0.05 0.05 0.05"
+        position="0 0 0"
+        rotation="-90 0 0"
+        animation-mixer="loop: repeat; timeScale: 1"
+      ></a-entity>
+    </a-marker>
+
+    <a-entity camera></a-entity>
+  </a-scene>
+
+  <!-- UI Overlay -->
+  <div id="ui-overlay">
+
+    <div id="header">
+      <div class="dot active" id="status-dot"></div>
+      <h1>Conveyor Belt AR</h1>
+      <span>Vokasi UB</span>
+    </div>
+
+    <div id="scale-controls">
+      <div class="ctrl-btn" id="btn-plus">+</div>
+      <div class="ctrl-btn" id="btn-minus">−</div>
+      <div class="ctrl-btn" id="btn-reset">↺</div>
+    </div>
+
+    <div id="instruction">
+      <p>Arahkan kamera ke <span>Hiro Marker</span><br>untuk menampilkan model 3D</p>
+    </div>
+
+    <div id="marker-box">
+      <!-- Preview marker Hiro dalam base64 mini -->
+      <img src="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png" alt="Hiro Marker">
+      <div>
+        <strong>Hiro Marker</strong>
+        <p>Print atau tampilkan di layar lain</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Scale control
+    const entity = document.querySelector('#conveyor-entity');
+    let currentScale = 0.05;
+    const scaleStep = 0.01;
+    const minScale = 0.01;
+    const maxScale = 0.3;
+
+    document.getElementById('btn-plus').addEventListener('click', () => {
+      currentScale = Math.min(currentScale + scaleStep, maxScale);
+      entity.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+    });
+
+    document.getElementById('btn-minus').addEventListener('click', () => {
+      currentScale = Math.max(currentScale - scaleStep, minScale);
+      entity.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      currentScale = 0.05;
+      entity.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+    });
+
+    // Status dot: hijau kalau marker terdeteksi
+    const marker = document.getElementById('main-marker');
+    const dot = document.getElementById('status-dot');
+    const instruction = document.getElementById('instruction');
+
+    marker.addEventListener('markerFound', () => {
+      dot.classList.add('active');
+      instruction.style.opacity = '0';
+    });
+
+    marker.addEventListener('markerLost', () => {
+      dot.classList.remove('active');
+      instruction.style.opacity = '1';
+    });
+  </script>
+
+</body>
+</html>

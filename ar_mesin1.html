@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>AR Mesin Industri</title>
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; overflow: hidden; background: #000; }
+    #ui { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; }
+
+    #header {
+      position: absolute; top: 0; left: 0; right: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 100%);
+      padding: 14px 16px 28px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    #status-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: #ff3b30;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    #status-dot.active { background: #34c759; }
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50% { opacity:0.5; transform:scale(0.8); }
+    }
+    #app-title { font-size: 14px; font-weight: 700; color: #fff; }
+
+    #lang-bar {
+      position: absolute; top: 14px; right: 16px;
+      display: flex; gap: 6px; pointer-events: auto;
+    }
+    .lang-btn {
+      padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(0,0,0,0.5); color: rgba(255,255,255,0.7);
+      cursor: pointer;
+    }
+    .lang-btn.active { background: #fff; color: #000; border-color: #fff; }
+
+    #model-bar {
+      position: absolute; bottom: 80px; left: 0; right: 0;
+      display: flex; gap: 8px; overflow-x: auto; padding: 0 16px;
+      pointer-events: auto; scrollbar-width: none;
+    }
+    #model-bar::-webkit-scrollbar { display: none; }
+    .model-btn {
+      flex-shrink: 0;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(12px);
+      border: 1.5px solid rgba(255,255,255,0.15);
+      border-radius: 14px; padding: 10px 14px;
+      cursor: pointer; min-width: 72px;
+    }
+    .model-btn.active { border-color: #fff; background: rgba(255,255,255,0.15); }
+    .model-btn .icon { font-size: 22px; }
+    .model-btn .label { font-size: 10px; color: rgba(255,255,255,0.85); text-align: center; font-weight: 500; }
+
+    #scale-controls {
+      position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+      display: flex; flex-direction: column; gap: 8px; pointer-events: auto;
+    }
+    .ctrl-btn {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff; font-size: 22px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; user-select: none;
+    }
+    .ctrl-btn:active { background: rgba(255,255,255,0.2); }
+
+    #loading-toast {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.8); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 16px; padding: 16px 24px;
+      text-align: center; display: none;
+    }
+    #loading-toast.visible { display: block; }
+    #loading-toast p { font-size: 13px; color: #fff; }
+
+    #info-panel {
+      position: absolute; bottom: 155px; left: 16px; right: 70px;
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 14px; padding: 12px 14px; display: none;
+    }
+    #info-panel.visible { display: block; }
+    #info-name { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    #info-desc { font-size: 11px; color: rgba(255,255,255,0.7); line-height: 1.5; }
+
+    #instruction {
+      position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 50px; padding: 10px 20px;
+      white-space: nowrap; text-align: center;
+    }
+    #instruction p { font-size: 12px; color: rgba(255,255,255,0.85); }
+    #instruction span { color: #ffd60a; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<a-scene
+  embedded
+  arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+  renderer="logarithmicDepthBuffer: true; antialias: true;"
+  vr-mode-ui="enabled: false"
+  loading-screen="enabled: false"
+>
+  <a-marker type="hiro" id="main-marker">
+    <a-entity id="ar-model" position="0 0.5 0" rotation="0 0 0"></a-entity>
+  </a-marker>
+  <a-entity camera></a-entity>
+</a-scene>
+
+<div id="ui">
+  <div id="header">
+    <div id="status-dot"></div>
+    <span id="app-title">AR Mesin Industri</span>
+  </div>
+
+  <div id="lang-bar">
+    <div class="lang-btn active" onclick="setLang('id',this)">ID</div>
+    <div class="lang-btn" onclick="setLang('en',this)">EN</div>
+    <div class="lang-btn" onclick="setLang('zh',this)">中文</div>
+  </div>
+
+  <div id="model-bar">
+    <div class="model-btn active" onclick="setModel('conveyor',this)">
+      <span class="icon">⚙️</span>
+      <span class="label" data-key="conveyor">Conveyor Belt</span>
+    </div>
+    <div class="model-btn" onclick="setModel('bubut',this)">
+      <span class="icon">🔩</span>
+      <span class="label" data-key="bubut">Mesin Bubut</span>
+    </div>
+    <div class="model-btn" onclick="setModel('cnc',this)">
+      <span class="icon">🤖</span>
+      <span class="label" data-key="cnc">Mesin CNC</span>
+    </div>
+    <div class="model-btn" onclick="setModel('generator',this)">
+      <span class="icon">⚡</span>
+      <span class="label" data-key="generator">Generator</span>
+    </div>
+  </div>
+
+  <div id="scale-controls">
+    <div class="ctrl-btn" id="btn-plus">+</div>
+    <div class="ctrl-btn" id="btn-minus">−</div>
+    <div class="ctrl-btn" id="btn-reset">↺</div>
+    <div class="ctrl-btn" id="btn-info">ℹ️</div>
+  </div>
+
+  <div id="loading-toast"><p id="loading-text">Memuat model...</p></div>
+
+  <div id="info-panel">
+    <div id="info-name"></div>
+    <div id="info-desc"></div>
+  </div>
+
+  <div id="instruction">
+    <p id="inst-text">Arahkan ke <span>Hiro Marker</span></p>
+  </div>
+</div>
+
+<script>
+const lang = {
+  id: {
+    title: "AR Mesin Industri",
+    inst: 'Arahkan ke <span>Hiro Marker</span>',
+    loading: "Memuat model...",
+    conveyor: "Conveyor Belt",
+    bubut: "Mesin Bubut",
+    cnc: "Mesin CNC",
+    generator: "Generator",
+    desc: {
+      conveyor: "Sistem transportasi material menggunakan belt bergerak yang didukung roller dan motor penggerak.",
+      bubut: "Mesin perkakas untuk membentuk benda kerja dengan cara memutar benda dan menyayat dengan pahat.",
+      cnc: "Mesin perkakas otomatis dikendalikan komputer untuk proses pemotongan dan pemesinan presisi.",
+      generator: "Alat konversi energi mekanik menjadi energi listrik menggunakan prinsip induksi elektromagnetik."
+    }
+  },
+  en: {
+    title: "Industrial Machine AR",
+    inst: 'Point at <span>Hiro Marker</span>',
+    loading: "Loading model...",
+    conveyor: "Conveyor Belt",
+    bubut: "Lathe Machine",
+    cnc: "CNC Machine",
+    generator: "Generator",
+    desc: {
+      conveyor: "A material transport system using a moving belt supported by rollers and a drive motor.",
+      bubut: "A machine tool that shapes workpieces by rotating and cutting with a tool bit.",
+      cnc: "Computer-controlled machine tool for precision cutting and machining operations.",
+      generator: "Converts mechanical energy into electrical energy using electromagnetic induction."
+    }
+  },
+  zh: {
+    title: "工业机械AR",
+    inst: '将相机对准 <span>Hiro标记</span>',
+    loading: "加载模型中...",
+    conveyor: "传送带",
+    bubut: "车床",
+    cnc: "数控机床",
+    generator: "发电机",
+    desc: {
+      conveyor: "使用由滚轮和驱动电机支撑的移动皮带的物料运输系统。",
+      bubut: "通过旋转工件并用刀具切削来成形工件的机床。",
+      cnc: "计算机控制的机床，用于精密切削和加工操作。",
+      generator: "利用电磁感应原理将机械能转换为电能的装置。"
+    }
+  }
+};
+
+const modelConfig = {
+  conveyor:  { src: 'conveyor_belt.glb',  scale: 0.05, posY: 0.5 },
+  bubut:     { src: 'mesin_bubut.glb',    scale: 0.04, posY: 0.3 },
+  cnc:       { src: 'mesin_cnc.glb',      scale: 0.04, posY: 0.3 },
+  generator: { src: 'generator.glb',      scale: 0.05, posY: 0.4 },
+};
+
+let currentLang = 'id';
+let currentModel = 'conveyor';
+let currentScale = 0.05;
+let infoVisible = false;
+
+function setLang(l, el) {
+  currentLang = l;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  updateUI();
+}
+
+function setModel(m, el) {
+  currentModel = m;
+  const cfg = modelConfig[m];
+  currentScale = cfg.scale;
+
+  // Show loading
+  const toast = document.getElementById('loading-toast');
+  document.getElementById('loading-text').textContent = lang[currentLang].loading;
+  toast.classList.add('visible');
+
+  // Remove old model
+  const entity = document.getElementById('ar-model');
+  entity.removeAttribute('gltf-model');
+
+  // Set new model after short delay
+  setTimeout(() => {
+    entity.setAttribute('gltf-model', 'url(' + cfg.src + ')');
+    entity.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+    entity.setAttribute('position', `0 ${cfg.posY} 0`);
+    entity.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1');
+
+    // Hide loading after model loads
+    entity.addEventListener('model-loaded', () => {
+      toast.classList.remove('visible');
+    }, { once: true });
+
+    // Fallback hide after 5 seconds
+    setTimeout(() => toast.classList.remove('visible'), 5000);
+  }, 300);
+
+  document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  updateInfo();
+}
+
+function updateUI() {
+  const t = lang[currentLang];
+  document.getElementById('app-title').textContent = t.title;
+  document.getElementById('inst-text').innerHTML = t.inst;
+  document.querySelectorAll('[data-key]').forEach(el => {
+    const key = el.getAttribute('data-key');
+    if (t[key]) el.textContent = t[key];
+  });
+  updateInfo();
+}
+
+function updateInfo() {
+  const t = lang[currentLang];
+  document.getElementById('info-name').textContent = t[currentModel];
+  document.getElementById('info-desc').textContent = t.desc[currentModel];
+}
+
+// Scale controls
+document.getElementById('btn-plus').addEventListener('click', () => {
+  currentScale = Math.min(currentScale + 0.01, 0.3);
+  document.getElementById('ar-model').setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+});
+document.getElementById('btn-minus').addEventListener('click', () => {
+  currentScale = Math.max(currentScale - 0.01, 0.005);
+  document.getElementById('ar-model').setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+});
+document.getElementById('btn-reset').addEventListener('click', () => {
+  currentScale = modelConfig[currentModel].scale;
+  document.getElementById('ar-model').setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+});
+document.getElementById('btn-info').addEventListener('click', () => {
+  infoVisible = !infoVisible;
+  document.getElementById('info-panel').classList.toggle('visible', infoVisible);
+});
+
+// Marker detection
+const marker = document.getElementById('main-marker');
+const dot = document.getElementById('status-dot');
+marker.addEventListener('markerFound', () => {
+  dot.classList.add('active');
+  document.getElementById('instruction').style.opacity = '0';
+});
+marker.addEventListener('markerLost', () => {
+  dot.classList.remove('active');
+  document.getElementById('instruction').style.opacity = '1';
+});
+
+// Load default model on start
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    const entity = document.getElementById('ar-model');
+    const cfg = modelConfig['conveyor'];
+    entity.setAttribute('gltf-model', 'url(' + cfg.src + ')');
+    entity.setAttribute('scale', `${cfg.scale} ${cfg.scale} ${cfg.scale}`);
+    entity.setAttribute('position', `0 ${cfg.posY} 0`);
+    entity.setAttribute('animation-mixer', 'loop: repeat; timeScale: 1');
+  }, 1000);
+});
+
+updateUI();
+</script>
+</body>
+</html>
